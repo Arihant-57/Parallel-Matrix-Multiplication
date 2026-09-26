@@ -202,12 +202,12 @@ flowchart TD
 | **Sequential CPU** | 1 CPU Core (Single-Threaded) | `321.280 s` | `1.00×` (Baseline) | $C[0][0] = 4000.00$ | Reference measurement |
 | **OpenMP** | 8 CPU Cores (Shared Memory) | `104.490 s` | `3.07×` | $C[0][0] = 4000.00$ | Reference measurement |
 | **MPI Cluster** | 4 VM Nodes (Distributed Network) | `226.170 s` | `1.42×` | $C[0][0] = 4000.00$ | Reference measurement |
-| **CUDA (Kernel)** | NVIDIA GPU (Grid $250 \times 250$, Block $16 \times 16$) | `248.401382 ms`<br/>(`0.248401 s`) | *See note below | $C[0][0] = 4000.00$ | Current reproduced measurement |
+| **CUDA (Total Phase)** | NVIDIA GPU (Grid $250 \times 250$, Block $16 \times 16$) | `0.273303 s` | `1175.55×` | $C[0][0] = 4000.00$ | Current reproduced measurement |
 
 > [!NOTE]
 > **CUDA Timing Details**:
-> - **Kernel Execution Time**: `248.401382 ms` (`0.248401382 s`), captured via high-precision `cudaEvent` timers around the kernel launch.
-> - **Total CUDA Phase Time**: **Not reported** (terminal output did not record total phase duration including host-device PCIe transfers; not estimated or fabricated).
+> - **Kernel Execution Time**: `0.249214 s` (`249.214 ms`), captured via high-precision `cudaEvent` timers around the kernel launch.
+> - **Total CUDA Phase Time**: `0.273303 s`, measured from the start of the CUDA phase through completion of the device-to-host transfer.
 > - *\*Direct speedup comparisons between isolated GPU kernel time and full end-to-end CPU/MPI wall-clock execution times are omitted to preserve scientific rigor.*
 
 ---
