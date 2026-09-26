@@ -194,8 +194,8 @@ flowchart TD
 > [!IMPORTANT]
 > **Measurement Source Notice**:
 > - **Sequential**, **OpenMP**, and **MPI** timings originate from the **original reference experiment**.
-> - **CUDA** timing originates from the **current reproduced measurement** on the local GPU test environment.
-> - Because hardware environments and measurement scopes differ (CPU wall-clock vs. isolated GPU kernel compute time), values are categorized explicitly by measurement type.
+> - **CUDA** timing originates from the **current reproduced measurement** on an **NVIDIA GeForce RTX 3050 6GB** (Windows, `nvcc -O2 -arch=sm_86`).
+> - Because hardware environments differ, the cross-paradigm speedup comparison is illustrative and **not a controlled same-hardware benchmark**.
 
 | Implementation | Hardware / Resources | Execution Time | Speedup Factor | Verification | Measurement Type |
 | :--- | :--- | ---: | ---: | :---: | :--- |
@@ -206,9 +206,9 @@ flowchart TD
 
 > [!NOTE]
 > **CUDA Timing Details**:
-> - **Kernel Execution Time**: `0.249214 s` (`249.214 ms`), captured via high-precision `cudaEvent` timers around the kernel launch.
-> - **Total CUDA Phase Time**: `0.273303 s`, measured from the start of the CUDA phase through completion of the device-to-host transfer.
-> - *\*Direct speedup comparisons between isolated GPU kernel time and full end-to-end CPU/MPI wall-clock execution times are omitted to preserve scientific rigor.*
+> - **Kernel Execution Time**: `0.249214 s` (`249.214 ms`), captured via high-precision `cudaEvent` timers placed immediately around the kernel launch.
+> - **Total CUDA Phase Time**: `0.273303 s`, covering host-to-device transfer, kernel execution, device-to-host transfer, and synchronization.
+> - The overall speedup comparison (`1175.55×`) uses the total CUDA phase time against the sequential reference time (`321.280 s`). Because these measurements were obtained in different hardware environments, this comparison is illustrative rather than a controlled same-hardware benchmark.
 
 ---
 
@@ -243,11 +243,11 @@ flowchart TD
 | **Workload Dimensions** | $4000 \times 4000$ dense matrix ($16,000,000$ elements) |
 | **CUDA Block Dimensions** | $16 \times 16$ threads per block |
 | **CUDA Grid Dimensions** | $250 \times 250$ blocks ($62,500$ blocks) |
-| **Threads Launched** | **16 million CUDA threads launched across 62,500 blocks**<br/>($250 \times 250$ blocks, $16 \times 16$ threads per block, $62,500$ blocks, $16,000,000$ threads launched) |
-| **Kernel Execution Time** | **`248.401382 ms`** (`0.248401382 s`) |
-| **Total CUDA Phase Time** | **Not reported** |
+| **Threads Launched** | **16 million CUDA threads across 62,500 blocks**<br/>($250 \times 250$ blocks, $16 \times 16$ threads per block, $62,500$ blocks, $16,000,000$ threads) |
+| **Kernel Execution Time** | **`249.214 ms`** (`0.249214 s`) — kernel-only, measured via `cudaEvent` timers |
+| **Total CUDA Phase Time** | **`0.273303 s`** — includes H2D transfer, kernel execution, D2H transfer, and synchronization |
 | **Correctness Verification** | **`C[0][0] = 4000.00`** |
-| **Measurement Source** | Current reproduced measurement |
+| **Measurement Source** | Current reproduced measurement (NVIDIA GeForce RTX 3050 6GB, `nvcc -O2 -arch=sm_86`) |
 
 ![CUDA Matrix Multiplication Result](results/cuda/execution/cuda_result.png)
 
@@ -258,14 +258,17 @@ flowchart TD
 ```mermaid
 flowchart LR
     A["Host Memory<br/>h_A, h_B (RAM)"] -->|cudaMemcpy H2D| B["GPU Device Memory<br/>d_A, d_B (VRAM)"]
-    B --> C["CUDA Kernel Execution<br/>matMulKernel<<<250x250, 16x16>>><br/>Time: 248.401382 ms"]
+    B --> C["CUDA Kernel Execution<br/>matMulKernel<<<250x250, 16x16>>><br/>Kernel Time: 249.214 ms"]
     C --> D["GPU Result Memory<br/>d_C (VRAM)"]
     D -->|cudaMemcpy D2H| E["Host Memory<br/>h_C (RAM)"]
     E --> F["Verification Step<br/>C[0][0] == 4000.00"]
 ```
 
 > [!IMPORTANT]
-> **Measurement Scope**: The recorded `248.401382 ms` strictly reflects the computational time spent executing `matMulKernel<<<grid, block>>>` on the GPU streaming multiprocessors. It excludes PCIe bus data transfer times (`cudaMemcpyHostToDevice` and `cudaMemcpyDeviceToHost`).
+> **Measurement Scope**:
+> - The recorded **`249.214 ms`** (`0.249214 s`) reflects the computational time spent executing `matMulKernel<<<grid, block>>>` on the GPU streaming multiprocessors, captured via `cudaEvent` timers.
+> - The **total CUDA phase time** is **`0.273303 s`**, which includes host-to-device transfer (`cudaMemcpyHostToDevice`), kernel execution, device-to-host transfer (`cudaMemcpyDeviceToHost`), and synchronization.
+> - The overall performance comparison uses `0.273303 s` for a fair end-to-end comparison against CPU and MPI runtimes.
 
 ---
 
@@ -491,7 +494,7 @@ Parallel-Matrix-Multiplication/
 - **Sequential Baseline**: Sequential execution processes one instruction stream on a single CPU core, resulting in a runtime of $321.280\text{ s}$ bound by clock speed and the cubic complexity $\mathcal{O}(N^3)$ of dense matrix multiplication.
 - **OpenMP Shared-Memory Parallelism**: OpenMP distributes loop iterations across 8 CPU threads within a shared memory space, achieving $104.490\text{ s}$ ($3.07\times$ speedup over the reference baseline) without requiring inter-process data communication.
 - **MPI Distributed-Memory Parallelism**: The MPI cluster distributes computation across 4 VM nodes in $226.170\text{ s}$ ($1.42\times$ speedup over the reference baseline). Communication overhead—scattering rows of Matrix $A$ and broadcasting Matrix $B$ across virtual network adapters—contributes significantly to total runtime.
-- **CUDA Massively Parallel SIMT**: The CUDA implementation offloads matrix multiplication to the GPU, mapping every output cell to an individual thread across $62,500$ blocks. The current reproduced benchmark recorded a kernel execution time of $248.401382\text{ ms}$ ($0.248401382\text{ s}$).
+- **CUDA Massively Parallel SIMT**: The CUDA implementation offloads matrix multiplication to the GPU, mapping every output cell to an individual thread across $62,500$ blocks. The current reproduced benchmark (NVIDIA GeForce RTX 3050 6GB) recorded a kernel execution time of $249.214\text{ ms}$ ($0.249214\text{ s}$) and a total CUDA phase time of $0.273303\text{ s}$, yielding an illustrative $1175.55\times$ speedup against the sequential reference.
 - **Deterministic Verification**: The implementations use $C[0][0] = 4000.00$ as the correctness check. The current reproduced CUDA run verified this value successfully.
 
 ---
@@ -499,7 +502,7 @@ Parallel-Matrix-Multiplication/
 ## Future Work
 
 - **Multi-Run Statistical Profiling**: Execute each implementation across multiple iterations to evaluate mean runtimes and standard deviations.
-- **End-to-End CUDA Timing**: Instrument and capture total CUDA phase time including host-to-device (`cudaMemcpyHostToDevice`) and device-to-host (`cudaMemcpyDeviceToHost`) data transfers.
+- **Controlled Cross-Architecture Benchmarking**: Repeat all implementations on the same hardware and runtime environment for statistically comparable end-to-end measurements.
 - **Hardware Counter & Cache Analysis**: Profile L1/L2 cache misses, memory bandwidth utilization, and GPU streaming multiprocessor (SM) occupancy.
 - **Workload Scalability**: Evaluate performance across varied problem sizes ($N = 1000, 2000, 4000, 8000$) to observe communication vs. computation scaling behavior.
 - **Unified Visualizations**: Generate updated multi-paradigm benchmark charts incorporating verified measurements across all architectures.
